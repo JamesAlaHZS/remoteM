@@ -1,0 +1,25 @@
+CMakeFiles/xmrig.dir/src/crypto/randomx/jit_compiler_x86_static.S.o: \
+ /home/ala/xmrig/src/crypto/randomx/jit_compiler_x86_static.S \
+ /usr/include/stdc-predef.h \
+ /home/ala/xmrig/src/crypto/randomx/asm/program_prologue_linux.inc \
+ /home/ala/xmrig/src/crypto/randomx/asm/program_xmm_constants.inc \
+ /home/ala/xmrig/src/crypto/randomx/asm/program_imul_rcp_store.inc \
+ /home/ala/xmrig/src/crypto/randomx/asm/program_loop_load.inc \
+ /home/ala/xmrig/src/crypto/randomx/asm/program_loop_load_xop.inc \
+ /home/ala/xmrig/src/crypto/randomx/asm/program_read_dataset.inc \
+ /home/ala/xmrig/src/crypto/randomx/asm/program_read_dataset_sshash_init.inc \
+ /home/ala/xmrig/src/crypto/randomx/asm/program_read_dataset_sshash_fin.inc \
+ /home/ala/xmrig/src/crypto/randomx/asm/program_loop_store.inc \
+ /home/ala/xmrig/src/crypto/randomx/asm/program_sshash_avx2_save_registers.inc \
+ /home/ala/xmrig/src/crypto/randomx/asm/program_sshash_avx2_constants.inc \
+ /home/ala/xmrig/src/crypto/randomx/asm/program_sshash_avx2_loop_begin.inc \
+ /home/ala/xmrig/src/crypto/randomx/asm/program_sshash_avx2_loop_end.inc \
+ /home/ala/xmrig/src/crypto/randomx/asm/program_sshash_avx2_epilogue.inc \
+ /home/ala/xmrig/src/crypto/randomx/asm/program_sshash_avx2_ssh_load.inc \
+ /home/ala/xmrig/src/crypto/randomx/asm/program_sshash_avx2_ssh_prefetch.inc \
+ /home/ala/xmrig/src/crypto/randomx/asm/program_epilogue_store.inc \
+ /home/ala/xmrig/src/crypto/randomx/asm/program_epilogue_linux.inc \
+ /home/ala/xmrig/src/crypto/randomx/asm/program_sshash_load.inc \
+ /home/ala/xmrig/src/crypto/randomx/asm/program_sshash_prefetch.inc \
+ /home/ala/xmrig/src/crypto/randomx/asm/program_sshash_constants.inc \
+ /home/ala/xmrig/src/crypto/randomx/asm/randomx_reciprocal.inc
