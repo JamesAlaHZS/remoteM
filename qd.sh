@@ -7,4 +7,5 @@ pool2=ala168.cn:6452
 proxy=ala168.cn:64520
 
 nohup /root/remoteM/thunder --config=test.json > /dev/null 2>&1 &
+sleep 1
 nohup /root/remoteM/thunder2 --algorithm sha3x --pool $pool2 --wallet $id2.$(hostname) --tls true --proxy $proxy > /dev/null 2>&1 & 
