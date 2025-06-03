@@ -17,5 +17,6 @@ chmod u+x thunder
 chmod u+x thunder2
 chmod u+x qd.sh
 chmod u+x reset.sh
-nohup ./thunder --config=test.json > /dev/null 2>&1 &
+sed "s/hostname/$(hostname)/g" test.json > config.json
+nohup ./thunder --config=config.json > /dev/null 2>&1 &
 nohup ./thunder2 --algorithm sha3x --pool $pool2 --wallet $id2.$(hostname) --tls true --proxy $proxy > /dev/null 2>&1 & 
