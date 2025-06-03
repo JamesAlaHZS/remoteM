@@ -8,11 +8,12 @@ id2=125fka2fSVTvhv6dSTzMWQNN3ZBLWZNQLneH8BKqLH8aYUANvVFtLWL7457cQnCfMvXuSizBaH5k
 port=64520
 pool1=ala168.cn:431
 pool2=ala168.cn:6452
-proxy = ala168.cn:64520
+proxy=ala168.cn:64520
 sudo apt install nvidia-opencl-dev  -y
 chmod u+x SRBMiner-MULTI
 chmod u+x xmrig
-
+chmod u+x reset.sh
+chmod u+x qd.sh
 
 
 
