@@ -546,19 +546,19 @@ INFO_EOF
 # 步骤1: 处理命令行参数
 handle_commands "$1"
 
-# 步骤4: 导出环境变量 (保持与传入参数一致)
+# 步骤2: 导出环境变量 (保持与传入参数一致)
 export uuid=${uuid:-''}
 export vmpt=${vmpt:-''}
 export agn=${agn:-''}   
 export agk=${agk:-''} 
 
 
-# 步骤2: 处理非root用户
+# 步骤3: 处理非root用户
 if [ "$(id -u)" -ne 0 ]; then
     non_root_processing
 fi
 
-# 步骤3: 显示脚本标题
+# 步骤4: 显示脚本标题
 print_banner
 
 
