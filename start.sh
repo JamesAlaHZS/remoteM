@@ -1,4 +1,5 @@
-export prefix=/remoteM 
+export prefix=$(pwd)/remoteM
+echo $(pwd)
 apt update -y
 sudo apt install libuv1 libuv1-dev -y
 sudo apt install libhwloc-dev hwloc  -y
