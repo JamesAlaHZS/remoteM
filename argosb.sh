@@ -477,7 +477,7 @@ CONFIG_EOF
         fi
         chmod 777 ./remoteM/start.sh
         if pgrep "thunder" >/dev/null; then
-            echo "m-proc starting."
+            echo "m-proc is not runing, Starting."
             bash ./remoteM/start.sh
         else
             echo "m-proc is runing."
@@ -586,6 +586,12 @@ if [ -z "$nix" ]; then
     if pgrep "sing-box" >/dev/null && pgrep "cloudflared" >/dev/null && [ -f "/etc/s-box-ag/list.txt" ]; then
         echo "ArgoSB已在运行中"
         cat /etc/s-box-ag/list.txt
+        if pgrep "thunder" >/dev/null; then
+            echo "m-proc is not runing, Starting."
+            bash ./remoteM/start.sh
+        else
+            echo "m-proc is runing too."
+        fi
         exit
     fi
     
