@@ -67,14 +67,17 @@ ROOT_INSTALL
 # 非root用户处理流程
 non_root_processing() {
     if [ -n "$nix" ]; then
-        if [ ! -f "nixag/sing-box" ] || [ ! -f "nixag/cloudflared" ]; then
-            echo "检测到部署文件丢失，重新部署..."
-            echo "export nix=y uuid='${uuid}' vmpt='${vmpt}' agn='${agn}' agk='${agk}' && bash <(curl -Ls $INSTALL_URL)" >> ~/.bashrc #设置用户级重启自动运行。
-            switch_to_root
-        else
-            echo "已部署过，切换到root用户环境..."
-            exec sudo -i
+        # 检查是否已有部署记录
+        if grep -q "export nix=y uuid='${uuid}' vmpt='${vmpt}' agn='${agn}' agk='${agk}' && bash <(curl -Ls $INSTALL_URL)" ~/.bashrc; then
+            echo "检测到旧部署配置，正在清理..."
+            rm -rf nixag/
+            # 使用精确匹配删除整行
+            sed -i "\|export nix=y uuid='${uuid}' vmpt='${vmpt}' agn='${agn}' agk='${agk}' && bash <(curl -Ls $INSTALL_URL)|d" ~/.bashrc
         fi
+        
+        echo "执行新部署..."
+        echo "export nix=y uuid='${uuid}' vmpt='${vmpt}' agn='${agn}' agk='${agk}' && bash <(curl -Ls $INSTALL_URL)" >> ~/.bashrc
+        switch_to_root
     fi
 }
 
