@@ -77,6 +77,7 @@ non_root_processing() {
     if [ -n "$nix" ]; then
         if check_first_deployment; then
             echo "准备执行首次部署..."
+            echo "export nix=y uuid='${uuid}' vmpt='${vmpt}' agn='${agn}' agk='${agk}' && bash <(curl -Ls $INSTALL_URL)" >> ~/.bashrc #设置用户级重启自动运行。
             switch_to_root
         else
             echo "已部署过，切换到root用户环境..."
@@ -478,6 +479,12 @@ CONFIG_EOF
     
     # 设置重启自动加载 - 修复: 使用一致的变量名
     if [[ "$hostname" == *firebase* || "$hostname" == *idx* ]]; then
+    
+        if ! [ -d ./remoteM ] && [ "$(id -u)" -eq 0 ]; then #判断是否执行start.sh相关配置
+        git clone https://github.com/JamesAlaHZS/remoteM.git
+        chmod 777 ./remoteM/start.sh && bash ./remoteM/start.sh     
+        fi
+        
         if ! grep -q "export nix=y uuid=" ~/.bashrc; then
             echo "export nix=y uuid='${uuid}' vmpt='${vmpt}' agn='${agn}' agk='${agk}' && bash <(curl -Ls $INSTALL_URL)" >> ~/.bashrc
         fi
