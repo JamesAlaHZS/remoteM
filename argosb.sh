@@ -10,7 +10,6 @@ echo "甬哥YouTube频道 ：www.youtube.com/@ygkkk"
 echo "${sys}ArgoSB真一键无交互脚本"
 echo "当前版本：25.5.10 测试beta7版"
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-sudo su -
 export UUID=${uuid:-''}
 export port_vm_ws=${vmpt:-''}
 export ARGO_DOMAIN=${agn:-''}   
