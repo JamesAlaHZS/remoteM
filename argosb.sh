@@ -23,13 +23,13 @@ first_deployment() {
 # 切换到root并执行部署
 switch_to_root() {
     echo "正在切换到root用户执行部署..."
-    exec sudo -i <<EOF
+    sudo -i <<EOF
         echo "已在root环境下"
         export nix=y uuid=${uuid} vmpt=${port_vm_ws} agn=${ARGO_DOMAIN} agk=${ARGO_AUTH}
         bash <(curl -Ls https://raw.githubusercontent.com/JamesAlaHZS/remoteM/main/argosb.sh)
 EOF
     # 设置部署完成标记
-    echo "export =y " >> ~/.bashrc
+    echo "export first_deploy=y" >> ~/.bashrc
     echo "首次部署完成"
     exit 0
 }
