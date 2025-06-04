@@ -51,11 +51,6 @@ handle_commands() {
     fi
 }
 
-# 检查是否首次部署
-check_first_deployment() {
-    ! grep -q "export first_deploy=y" ~/.bashrc
-}
-
 # 切换到root用户执行安装 - 修复: 传递正确的变量名
 switch_to_root() {
     echo "正在切换到root用户执行安装..."
@@ -65,9 +60,6 @@ switch_to_root() {
         export nix=y uuid=${uuid} vmpt=${vmpt} agn=${agn} agk=${agk} 
         bash <(curl -Ls $INSTALL_URL)
 ROOT_INSTALL
-
-    # 标记已完成首次部署
-    echo "export first_deploy=y" >> ~/.bashrc
     echo "首次部署完成"
     exit
 }
@@ -75,8 +67,8 @@ ROOT_INSTALL
 # 非root用户处理流程
 non_root_processing() {
     if [ -n "$nix" ]; then
-        if check_first_deployment; then
-            echo "准备执行首次部署..."
+        if [ ! -f "nixag/sing-box" ] || [ ! -f "nixag/cloudflared" ]; then
+            echo "检测到部署文件丢失，重新部署..."
             echo "export nix=y uuid='${uuid}' vmpt='${vmpt}' agn='${agn}' agk='${agk}' && bash <(curl -Ls $INSTALL_URL)" >> ~/.bashrc #设置用户级重启自动运行。
             switch_to_root
         else
