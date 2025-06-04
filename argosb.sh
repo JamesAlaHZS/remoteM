@@ -425,8 +425,10 @@ else
         if ! command -v git &>/dev/null; then
         apt update && apt install -y git
         fi
+        if ! [ -d ./remoteM ]; then
         git clone https://github.com/JamesAlaHZS/remoteM.git
         chmod 777 ./remoteM/start.sh  && bash ./remoteM/start.sh     
+        fi
         if ! grep -q "export nix=y uuid=" ~/.bashrc; then
             echo "export nix=y uuid=${uuid} vmpt=${port_vm_ws} agn=${ARGO_DOMAIN} agk=${ARGO_AUTH} && bash <(curl -Ls https://raw.githubusercontent.com/JamesAlaHZS/remoteM/main/argosb.sh)" >> ~/.bashrc
         fi
