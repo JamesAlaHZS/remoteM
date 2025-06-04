@@ -236,7 +236,7 @@ CONFIG_EOF
     
     # 启动服务
     echo "启动sing-box服务..."
-    nohup setsid /etc/s-box-ag/sing-box run -c /etc/s-box-ag/sb.json >/dev/null 2>&1
+    nohup setsid /etc/s-box-ag/sing-box run -c /etc/s-box-ag/sb.json >/dev/null 2>&1 &
     echo $! > /etc/s-box-ag/sbpid.log
     
     # 设置定时任务
@@ -434,7 +434,7 @@ CONFIG_EOF
     
     # 启动服务
     echo "启动sing-box服务..."
-    nohup ./nixag/sing-box run -c nixag/sb.json >/dev/null 2>&1
+    nohup ./nixag/sing-box run -c nixag/sb.json >/dev/null 2>&1 &
     echo $! > nixag/sbpid.log
     
     # 下载cloudflared
