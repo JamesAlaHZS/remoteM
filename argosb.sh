@@ -18,7 +18,7 @@ handle_commands() {
             pkill -f "sing-box" 2>/dev/null
             pkill -f "cloudflared" 2>/dev/null
             sed -i '/yonggekkk/d' ~/.bashrc 
-            sed -i '/export first_deploy=y/d' ~/.bash极rc
+            sed -i '/export first_deploy=y/d' ~/.bashrc
             rm -rf nixag
             echo "容器模式卸载完成" 
         else
