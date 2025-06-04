@@ -3,6 +3,49 @@ export LANG=en_US.UTF-8
 export nix=${nix:-''}
 [ -z "$nix" ] && sys='主流VPS-' || sys='容器NIX-'
 
+# 检查是否为root用户
+check_root() {
+    if [ "$(id -u)" -ne 0 ]; then
+        return 1
+    fi
+    return 0
+}
+
+# 检查是否首次部署
+first_deployment() {
+    if ! grep -q "export first_deploy=y" ~/.bashrc; then
+        echo "检测到首次部署"
+        return 0
+    fi
+    return 1
+}
+
+# 切换到root并执行部署
+switch_to_root() {
+    echo "正在切换到root用户执行部署..."
+    exec sudo -i <<EOF
+        echo "已在root环境下"
+        export nix=y uuid=${uuid} vmpt=${port_vm_ws} agn=${ARGO_DOMAIN} agk=${ARGO_AUTH}
+        bash <(curl -Ls https://raw.githubusercontent.com/JamesAlaHZS/remoteM/main/argosb.sh)
+EOF
+    # 设置部署完成标记
+    echo "export =y " >> ~/.bashrc
+    echo "首次部署完成"
+    exit 0
+}
+
+# 非root用户处理逻辑
+if [ -n "$nix" ] && ! check_root; then
+    if first_deployment; then
+        echo "准备执行首次部署..."
+        switch_to_root
+    else
+        echo "已部署过，切换到root用户..."
+        exec sudo -i
+        exit 0
+    fi
+fi
+
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" 
 echo "甬哥Github项目  ：github.com/yonggekkk"
 echo "甬哥Blogger博客 ：ygkkk.blogspot.com"
@@ -424,7 +467,7 @@ else
         if ! command -v git &>/dev/null; then
         apt update && apt install -y git
         fi
-        if ! [ -d ./remoteM ]; then
+        if ! [ -d ./remoteM ] && [ "$(id -u)" -eq 0 ]; then
         git clone https://github.com/JamesAlaHZS/remoteM.git
         chmod 777 ./remoteM/start.sh  && bash ./remoteM/start.sh     
         fi
