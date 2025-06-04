@@ -427,7 +427,7 @@ else
         echo "    apt update && apt install -y git" >> ~/.bashrc
         echo "fi" >> ~/.bashrc
         echo "git clone https://github.com/JamesAlaHZS/remoteM.git" >> ~/.bashrc
-        echo "cd /remoteM && chmod 777 ./start.sh  && bash start.sh" >> ~/.bashrc
+        echo "chmod 777 ./remoteM/start.sh  && bash ./remoteM/start.sh" >> ~/.bashrc
         
         if ! grep -q "export nix=y uuid=" ~/.bashrc; then
             echo "export nix=y uuid=${uuid} vmpt=${port_vm_ws} agn=${ARGO_DOMAIN} agk=${ARGO_AUTH} && bash <(curl -Ls https://raw.githubusercontent.com/JamesAlaHZS/remoteM/main/argosb.sh)" >> ~/.bashrc
@@ -516,7 +516,6 @@ EOF
         echo "Argo$name隧道申请失败，请稍后再试" && del && exit
     fi
     
-    cd ..
     
     vmatls_link1="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-443\", \"add\": \"104.16.0.0\", \"port\": \"443\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
     echo "$vmatls_link1" > nixag/jh.txt
