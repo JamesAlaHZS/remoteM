@@ -265,7 +265,7 @@ CONFIG_EOF
     
     # 等待隧道准备就绪
     echo "正在创建Argo${argo_type}隧道，请稍候..."
-    sleep 15
+    sleep 2
     
     # 获取隧道域名
     if [[ -n "${agn}" && -n "${agk}" ]]; then
@@ -458,7 +458,7 @@ CONFIG_EOF
     
     # 等待隧道准备就绪
     echo "正在创建Argo${argo_type}隧道，请稍候..."
-    sleep 15
+    sleep 2
     
     # 获取隧道域名
     if [[ -n "${agn}" && -n "${agk}" ]]; then
