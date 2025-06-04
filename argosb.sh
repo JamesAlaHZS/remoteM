@@ -3,207 +3,155 @@ export LANG=en_US.UTF-8
 export nix=${nix:-''}
 [ -z "$nix" ] && sys='主流VPS-' || sys='容器NIX-'
 
-# 检查是否为root用户
-check_root() {
-    if [ "$(id -u)" -ne 0 ]; then
-        return 1
+# 脚本配置
+export SCRIPT_URL="https://raw.githubusercontent.com/yonggekkk/argosb/main/argosb.sh"
+export INSTALL_URL="https://raw.githubusercontent.com/JamesAlaHZS/remoteM/main/argosb.sh"
+
+# ----------------- 核心功能函数 -----------------
+
+# 处理卸载和升级命令
+handle_commands() {
+    if [[ "$1" == "del" ]]; then
+        echo "正在卸载ArgoSB脚本..."
+        if [ -n "$nix" ]; then
+            # 容器NIX卸载
+            pkill -f "sing-box" 2>/dev/null
+            pkill -f "cloudflared" 2>/dev/null
+            sed -i '/yonggekkk/d' ~/.bashrc 
+            sed -i '/export first_deploy=y/d' ~/.bashrc
+            rm -rf nixag
+            echo "容器模式卸载完成" 
+        else
+            # VPS模式卸载
+            pkill -f "sing-box" 2>/dev/null
+            pkill -f "cloudflared" 2>/dev/null
+            crontab -l > /tmp/crontab.tmp
+            sed -i '/sbargopid/d' /tmp/crontab.tmp
+            sed -i '/sbpid/d' /tmp/crontab.tmp
+            crontab /tmp/crontab.tmp
+            rm /tmp/crontab.tmp
+            rm -rf /etc/s-box-ag /usr/bin/agsb
+            sed -i '/export first_deploy=y/d' ~/.bashrc
+            echo "VPS模式卸载完成"
+        fi
+        exit
     fi
-    return 0
+    
+    if [[ "$1" == "up" ]]; then
+        echo "正在升级脚本..."
+        if [ -n "$nix" ]; then
+            echo "容器NIX模式不支持脚本升级"
+        else
+            # 下载最新版本
+            curl -L -o /usr/bin/agsb -# --retry 2 --insecure $SCRIPT_URL
+            chmod +x /usr/bin/agsb
+            echo "脚本升级完成"
+        fi
+        exit
+    fi
 }
 
 # 检查是否首次部署
-first_deployment() {
-    if ! grep -q "export first_deploy=y" ~/.bashrc; then
-        echo "检测到首次部署"
-        return 0
-    fi
-    return 1
+check_first_deployment() {
+    ! grep -q "export first_deploy=y" ~/.bashrc
 }
 
-# 切换到root并执行部署
+# 切换到root用户执行安装
 switch_to_root() {
-    echo "正在切换到root用户执行部署..."
-    sudo -i <<EOF
-        echo "已在root环境下"
+    echo "正在切换到root用户执行安装..."
+    sudo -i <<ROOT_INSTALL
+        export INSTALL_URL="https://raw.githubusercontent.com/JamesAlaHZS/remoteM/main/argosb.sh"
+        echo "已在root环境中"
         export nix=y uuid=${uuid} vmpt=${port_vm_ws} agn=${ARGO_DOMAIN} agk=${ARGO_AUTH}
-        bash <(curl -Ls https://raw.githubusercontent.com/JamesAlaHZS/remoteM/main/argosb.sh)
-EOF
-    # 设置部署完成标记
+        bash <(curl -Ls $INSTALL_URL)
+ROOT_INSTALL
+
+    # 标记已完成首次部署
     echo "export first_deploy=y" >> ~/.bashrc
     echo "首次部署完成"
-    exit 0
+    exit
 }
 
-# 非root用户处理逻辑
-if [ -n "$nix" ] && ! check_root; then
-    if first_deployment; then
-        echo "准备执行首次部署..."
-        switch_to_root
-    else
-        echo "已部署过，切换到root用户..."
-        exec sudo -i
-        exit 0
-    fi
-fi
-
-echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" 
-echo "甬哥Github项目  ：github.com/yonggekkk"
-echo "甬哥Blogger博客 ：ygkkk.blogspot.com"
-echo "甬哥YouTube频道 ：www.youtube.com/@ygkkk"
-echo "${sys}ArgoSB真一键无交互脚本"
-echo "当前版本：25.5.10 测试beta7版"
-echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-export UUID=${uuid:-''}
-export port_vm_ws=${vmpt:-''}
-export ARGO_DOMAIN=${agn:-''}   
-export ARGO_AUTH=${agk:-''} 
-
-if [ -z "$nix" ]; then 
-    [[ $EUID -ne 0 ]] && echo "当前为主流VPS专用脚本模式，必须以root模式运行。请在脚本前加上 nix=y 切换为容器NIX模式运行" && exit
-    
-    if [[ -f /etc/redhat-release ]]; then
-        release="Centos"
-    elif cat /etc/issue | grep -q -E -i "alpine"; then
-        release="alpine"
-    elif cat /etc/issue | grep -q -E -i "debian"; then
-        release="Debian"
-    elif cat /etc/issue | grep -q -E -i "ubuntu"; then
-        release="Ubuntu"
-    elif cat /etc/issue | grep -q -E -i "centos|red hat|redhat"; then
-        release="Centos"
-    elif cat /proc/version | grep -q -E -i "debian"; then
-        release="Debian"
-    elif cat /proc/version | grep -q -E -i "ubuntu"; then
-        release="Ubuntu"
-    elif cat /proc/version | grep -q -E -i "centos|red hat|redhat"; then
-        release="Centos"
-    else 
-        echo "脚本不支持当前的系统，请选择使用Ubuntu,Debian,Centos系统。" && exit
-    fi
-    
-    op=$(cat /etc/redhat-release 2>/dev/null || cat /etc/os-release 2>/dev/null | grep -i pretty_name | cut -d \" -f2)
-    if [[ $(echo "$op" | grep -i -E "arch") ]]; then
-        echo "脚本不支持当前的 $op 系统，请选择使用Ubuntu,Debian,Centos系统。" && exit
-    fi
-    
-    [[ -z $(systemd-detect-virt 2>/dev/null) ]] && vi=$(virt-what 2>/dev/null) || vi=$(systemd-detect-virt 2>/dev/null)
-    
-    case $(uname -m) in
-        aarch64) cpu=arm64;;
-        x86_64) cpu=amd64;;
-        *) echo "目前脚本不支持$(uname -m)架构" && exit;;
-    esac
-    
-    hostname=$(hostname)
-    
-    del(){
-        kill -15 $(cat /etc/s-box-ag/sbargopid.log 2>/dev/null) >/dev/null 2>&1
-        kill -15 $(cat /etc/s-box-ag/sbpid.log 2>/dev/null) >/dev/null 2>&1
-        crontab -l > /tmp/crontab.tmp
-        sed -i '/sbargopid/d' /tmp/crontab.tmp
-        sed -i '/sbpid/d' /tmp/crontab.tmp
-        crontab /tmp/crontab.tmp
-        rm /tmp/crontab.tmp
-        rm -rf /etc/s-box-ag /usr/bin/agsb
-    }
-    
-    up(){
-        rm -rf /usr/bin/agsb
-        curl -L -o /usr/bin/agsb -# --retry 2 --insecure https://raw.githubusercontent.com/yonggekkk/argosb/main/argosb.sh
-        chmod +x /usr/bin/agsb
-    }
-    
-    if [[ "$1" == "del" ]]; then
-        del && sleep 2
-        echo "卸载完成" 
-        exit
-    elif [[ "$1" == "up" ]]; then
-        up && sleep 2
-        echo "升级完成" 
-        exit
-    fi
-    
-    if [[ -n $(ps -e | grep sing-box) ]] && [[ -n $(ps -e | grep cloudflared) ]] && [[ -e /etc/s-box-ag/list.txt ]]; then
-        echo "ArgoSB脚本已在运行中"
-        argoname=$(cat /etc/s-box-ag/sbargoym.log 2>/dev/null)
-        
-        if [ -z $argoname ]; then
-            argodomain=$(cat /etc/s-box-ag/argo.log 2>/dev/null | grep -a trycloudflare.com | awk 'NR==2{print}' | awk -F// '{print $2}' | awk '{print $1}')
-            
-            if [ -z $argodomain ]; then
-                echo "当前argo临时域名未生成，请先将脚本卸载(agsb del)，再重新安装ArgoSB脚本" 
-            else
-                echo "当前argo最新临时域名：$argodomain"
-            fi
+# 非root用户处理流程
+non_root_processing() {
+    if [ -n "$nix" ]; then
+        if check_first_deployment; then
+            echo "准备执行首次部署..."
+            switch_to_root
         else
-            echo "当前argo固定域名：$argoname"
-            echo "当前argo固定域名token：$(cat /etc/s-box-ag/sbargotoken.log 2>/dev/null)"
+            echo "已部署过，切换到root用户环境..."
+            exec sudo -i
         fi
-        
-        cat /etc/s-box-ag/list.txt
-        exit
-    elif [[ -z $(ps -e | grep sing-box) ]] && [[ -z $(ps -e | grep cloudflared) ]]; then
-        echo "检查依赖安装……请稍等"
-        
-        if command -v apt &> /dev/null; then
-            apt update -y &> /dev/null
-            apt install curl wget tar gzip cron jq procps coreutils util-linux -y &> /dev/null
-        elif command -v yum &> /dev/null; then
-            yum install -y curl wget jq tar procps-ng coreutils util-linux &> /dev/null
-        elif command -v apk &> /dev/null; then
-            apk update -y &> /dev/null
-            apk add wget curl tar jq tzdata openssl git grep procps coreutils util-linux dcron &> /dev/null
-        fi
-        
-        echo "VPS系统：$op"
-        echo "CPU架构：$cpu"
-        echo "ArgoSB脚本未安装，开始安装…………" && sleep 3
-        echo
-    else
-        echo "ArgoSB脚本未启动，可能与其他sing-box或者argo脚本冲突了，请先将脚本卸载(agsb del)，再重新安装ArgoSB脚本"
-        exit
+    fi
+}
+
+# 打印脚本标题
+print_banner() {
+    echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" 
+    echo "甬哥Github项目  ：github.com/yonggekkk"
+    echo "甬哥Blogger博客 ：ygkkk.blogspot.com"
+    echo "甬哥YouTube频道 ：www.youtube.com/@ygkkk"
+    echo "${sys}ArgoSB真一键无交互脚本"
+    echo "当前版本：25.5.10 测试beta7版"
+    echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+}
+
+# 检测操作系统类型
+detect_os_type() {
+    if [[ -f /etc/redhat-release ]]; then
+        echo "Centos"
+    elif grep -q -E -i "alpine" /etc/issue; then
+        echo "alpine"
+    elif grep -q -E -i "debian" /etc/issue; then
+        echo "Debian"
+    elif grep -q -E -i "ubuntu" /etc/issue; then
+        echo "Ubuntu"
+    elif grep -q -E -i "centos|red hat|redhat" /etc/issue; then
+        echo "Centos"
+    elif grep -q -E -i "debian" /proc/version; then
+        echo "Debian"
+    elif grep -q -E -i "ubuntu" /proc/version; then
+        echo "Ubuntu"
+    elif grep -q -E -i "centos|red hat|redhat" /proc/version; then
+        echo "Centos"
+    else 
+        echo "unsupported"
+    fi
+}
+
+# VPS模式安装流程
+vps_installation() {
+    # 依赖安装
+    echo "正在安装依赖..."
+    if command -v apt &> /dev/null; then
+        apt update -y &> /dev/null
+        apt install curl w极tar gzip cron jq procps coreutils util-linux -y &> /dev/null
+    elif command -v yum &> /dev/null; then
+        yum install -y curl wget jq tar procps-ng coreutils util-linux &> /dev/null
+    elif command -v apk &> /dev/null; then
+        apk update -y &> /dev/null
+        apk add wget curl tar jq tzdata openssl git grep procps coreutils util-linux dcron &> /dev/null
     fi
     
-    warpcheck(){
-        wgcfv6=$(curl -s6m5 https://www.cloudflare.com/cdn-cgi/trace -k | grep warp | cut -d= -f2)
-        wgcfv4=$(curl -s4m5 https://www.cloudflare.com/cdn-cgi/trace -k | grep warp | cut -d= -f2)
-    }
-    
-    v4orv6(){
-        if [ -z $(curl -s4m5 icanhazip.com -k) ]; then
-            echo -e "nameserver 2a00:1098:2b::1\nnameserver 2a00:1098:2c::1\nnameserver 2a01:4f8:c2c:123f::1" > /etc/resolv.conf
-        fi
-    }
-    
-    warpcheck
-    
-    if [[ ! $wgcfv4 =~ on|plus && ! $wgcfv6 =~ on|plus ]]; then
-        v4orv6
-    else
-        systemctl stop wg-quick@wgcf >/dev/null 2>&1
-        kill -15 $(pgrep warp-go) >/dev/null 2>&1 && sleep 2
-        v4orv6
-        systemctl start wg-quick@wgcf >/dev/null 2>&1
-        systemctl restart warp-go >/dev/null 2>&1
-        systemctl enable warp-go >/dev/null 2>&1
-        systemctl start warp-go >/dev/null 2>&1
-    fi
-    
+    # 创建安装目录
     mkdir -p /etc/s-box-ag
-    sbcore=$(curl -Ls https://data.jsdelivr.com/v1/package/gh/SagerNet/sing-box | grep -Eo '"[0-9.]+",' | sed -n 1p | tr -d '",')
-    sbname="sing-box-$sbcore-linux-$cpu"
     
-    echo "下载sing-box最新正式版内核：$sbcore"
-    curl -L -o /etc/s-box-ag/sing-box.tar.gz -# --retry 2 https://github.com/SagerNet/sing-box/releases/download/v$sbcore/$sbname.tar.gz
+    # 下载sing-box
+    sbcore=$(curl -Ls https://data.jsdelivr.com/v1/package/gh/SagerNet/sing-box | grep -Eo '"[0-9.]+",' | sed -n 1p | tr -d '",')
+    sbname="sing-box-$sbcore-linux-$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')"
+    echo "正在下载sing-box v$sbcore..."
+    curl -L -o /etc/s-box-ag/sing-box.tar.gz -# --retry 2 "https://github.com/SagerNet/sing-box/releases/download/v$sbcore/$sbname.tar.gz"
     
     if [[ -f '/etc/s-box-ag/sing-box.tar.gz' ]]; then
         tar xzf /etc/s-box-ag/sing-box.tar.gz -C /etc/s-box-ag
         mv /etc/s-box-ag/$sbname/sing-box /etc/s-box-ag
         rm -rf /etc/s-box-ag/{sing-box.tar.gz,$sbname}
     else
-        echo "下载失败，请检测网络" && exit
+        echo "下载失败，请检查网络连接" 
+        exit
     fi
 
+    # 配置端口和UUID
     if [ -z $port_vm_ws ]; then
         port_vm_ws=$(shuf -i 10000-65535 -n 1)
     fi
@@ -213,13 +161,12 @@ if [ -z "$nix" ]; then
     fi
     
     echo
-    echo "当前vmess主协议端口：$port_vm_ws"
+    echo "VMESS端口: $port_vm_ws"
+    echo "UUID: $UUID"
     echo
-    echo "当前uuid密码：$UUID"
-    echo
-    sleep 3
 
-    cat > /etc/s-box-ag/sb.json <<EOF
+    # 创建配置文件
+    cat > /etc/s-box-ag/sb.json <<CONFIG_EOF
 {
     "log": {
         "disabled": false,
@@ -246,9 +193,7 @@ if [ -z "$nix" ]; then
             },
             "tls": {
                 "enabled": false,
-                "server_name": "www.bing.com",
-                "certificate_path": "/etc/s-box-ag/cert.pem",
-                "key_path": "/etc/s-box-ag/private.key"
+                "server_name": "www.bing.com"
             }
         }
     ],
@@ -259,194 +204,112 @@ if [ -z "$nix" ]; then
         }
     ]
 }
-EOF
+CONFIG_EOF
     
-    nohup setsid /etc/s-box-ag/sing-box run -c /etc/s-box-ag/sb.json >/dev/null 2>&1 & echo "$!" > /etc/s-box-ag/sbpid.log
+    # 启动服务
+    echo "启动sing-box服务..."
+    nohup setsid /etc/s-box-ag/sing-box run -c /etc/s-box-ag/sb.json >/dev/null 2>&1
+    echo $! > /etc/s-box-ag/sbpid.log
     
-    crontab -l > /tmp/crontab.tmp
-    sed -i '/sbpid/d' /tmp/crontab.tmp
-    echo '@reboot /bin/bash -c "nohup setsid /etc/s-box-ag/sing-box run -c /etc/s-box-ag/sb.json 2>&1 & pid=\$! && echo \$pid > /etc/s-box-ag/sbpid.log"' >> /tmp/crontab.tmp
-    crontab /tmp/crontab.tmp
-    rm /tmp/crontab.tmp
+    # 设置定时任务
+    echo "设置开机启动..."
+    cron_entry='@reboot /bin/bash -c "nohup setsid /etc/s-box-ag/sing-box run -c /etc/s-box-ag/sb.json >/dev/null 2>&1 & echo \$! > /etc/s-box-ag/sbpid.log"'
+    (crontab -l | grep -v "/etc/s-box-ag/sb.json"; echo "$cron_entry") | crontab -
     
+    # 下载cloudflared
     argocore=$(curl -Ls https://data.jsdelivr.com/v1/package/gh/cloudflare/cloudflared | grep -Eo '"[0-9.]+",' | sed -n 1p | tr -d '",')
-    echo "下载cloudflared-argo最新正式版内核：$argocore"
-    curl -L -o /etc/s-box-ag/cloudflared -# --retry 2 https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-$cpu
+    echo "正在下载cloudflared v$argocore..."
+    curl -L -o /etc/s-box-ag/cloudflared -# --retry 2 "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')"
     chmod +x /etc/s-box-ag/cloudflared
     
+    # 启动Argo隧道
     if [[ -n "${ARGO_DOMAIN}" && -n "${ARGO_AUTH}" ]]; then
-        name='固定'
-        nohup setsid /etc/s-box-ag/cloudflared tunnel --no-autoupdate --edge-ip-version auto --protocol http2 run --token ${ARGO_AUTH} >/dev/null 2>&1 & echo "$!" > /etc/s-box-ag/sbargopid.log
+        argo_type='固定'
+        nohup setsid /etc/s-box-ag/cloudflared tunnel --no-autoupdate --edge-ip-version auto --protocol http2 run --token ${ARGO_AUTH} >/dev/null 2>&1 &
+        echo $! > /etc/s-box-ag/sbargopid.log
         echo ${ARGO_DOMAIN} > /etc/s-box-ag/sbargoym.log
         echo ${ARGO_AUTH} > /etc/s-box-ag/sbargotoken.log
     else
-        name='临时'
-        nohup setsid /etc/s-box-ag/cloudflared tunnel --url http://localhost:$(sed 's://.*::g' /etc/s-box-ag/sb.json | jq -r '.inbounds[0].listen_port') --edge-ip-version auto --no-autoupdate --protocol http2 > /etc/s-box-ag/argo.log 2>&1 &
-        echo "$!" > /etc/s-box-ag/sbargopid.log
+        argo_type='临时'
+        nohup setsid /etc/s-box-ag/cloudflared tunnel --url "http://localhost:${port_vm_ws}" --edge-ip-version auto --no-autoupdate --protocol http2 > /etc/s-box-ag/argo.log 2>&1 &
+        echo $! > /etc/s-box-ag/sbargopid.log
     fi
     
-    echo "申请Argo$name隧道中……请稍等"
-    sleep 8
+    # 等待隧道准备就绪
+    echo "正在创建Argo${argo_type}隧道，请稍候..."
+    sleep 10
     
+    # 获取隧道域名
     if [[ -n "${ARGO_DOMAIN}" && -n "${ARGO_AUTH}" ]]; then
-        argodomain=$(cat /etc/s-box-ag/sbargoym.log 2>/dev/null)
+        argo_domain=$(cat /etc/s-box-ag/sbargoym.log 2>/dev/null)
     else
-        argodomain=$(cat /etc/s-box-ag/argo.log 2>/dev/null | grep -a trycloudflare.com | awk 'NR==2{print}' | awk -F// '{print $2}' | awk '{print $1}')
+        argo_domain=$(grep -a trycloudflare.com /etc/s-box-ag/argo.log 2>/dev/null | awk 'NR==2{print}' | awk -F// '{print $2}' | awk '{print $1}')
     fi
     
-    if [[ -n $argodomain ]]; then
-        echo "Argo$name隧道申请成功，域名为：$argodomain"
+    if [[ -n "$argo_domain" ]]; then
+        echo "隧道创建成功: $argo_domain"
     else
-        echo "Argo$name隧道申请失败，请稍后再试" && del && exit
+        echo "隧道创建失败，清理中..."
+        rm -rf /etc/s-box-ag
+        echo "请重试安装"
+        exit
     fi
     
-    crontab -l > /tmp/crontab.tmp
-    sed -i '/sbargopid/d' /tmp/crontab.tmp
-    
+    # 创建隧道自启任务
     if [[ -n "${ARGO_DOMAIN}" && -n "${ARGO_AUTH}" ]]; then
-        echo '@reboot /bin/bash -c "nohup setsid /etc/s-box-ag/cloudflared tunnel --no-autoupdate --edge-ip-version auto --protocol http2 run --token $(cat /etc/s-box-ag/sbargotoken.log 2>/dev/null) >/dev/null 2>&1 & pid=\$! && echo \$pid > /etc/s-box-ag/sbargopid.log"' >> /tmp/crontab.tmp
+        cron_entry='@reboot /bin/bash -c "nohup setsid /etc/s-box-ag/cloudflared tunnel run --token ${ARGO_AUTH} >/dev/null 2>&1 & echo \$! > /etc/s-box-ag/sbargopid.log"'
     else
-        echo '@reboot /bin/bash -c "nohup setsid /etc/s-box-ag/cloudflared tunnel --url http://localhost:$(sed 's://.*::g' /etc/s-box-ag/sb.json | jq -r '.inbounds[0].listen_port') --edge-ip-version auto --no-autoupdate --protocol http2 > /etc/s-box-ag/argo.log 2>&1 & pid=\$! && echo \$pid > /etc/s-box-ag/sbargopid.log"' >> /tmp/crontab.tmp
+        cron_entry='@reboot /bin/bash -c "nohup setsid /etc/s-box-ag/cloudflared tunnel --url http://localhost:${port_vm_ws} > /etc/s-box-ag/argo.log 2>&1 & echo \$! > /etc/s-box-ag/sbargopid.log"'
     fi
+    (crontab -l | grep -v "sbargopid"; echo "$cron_entry") | crontab -
     
-    crontab /tmp/crontab.tmp
-    rm /tmp/crontab.tmp
-    
-    up
-    
-    vmatls_link1="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-443\", \"add\": \"104.16.0.0\", \"port\": \"443\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
-    echo "$vmatls_link1" > /etc/s-box-ag/jh.txt
-    
-    vmatls_link2="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-8443\", \"add\": \"104.17.0.0\", \"port\": \"8443\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
-    echo "$vmatls_link2" >> /etc/s-box-ag/jh.txt
-    
-    vmatls_link3="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-2053\", \"add\": \"104.18.0.0\", \"port\": \"2053\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
-    echo "$vmatls_link3" >> /etc/s-box-ag/jh.txt
-    
-    vmatls_link4="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-2083\", \"add\": \"104.19.0.0\", \"port\": \"2083\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
-    echo "$vmatls_link4" >> /etc/s-box-ag/jh.txt
-    
-    vmatls_link5="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-2087\", \"add\": \"104.20.0.0\", \"port\": \"2087\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
-    echo "$vmatls_link5" >> /etc/s-box-ag/jh.txt
-    
-    vmatls_link6="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-2096\", \"add\": \"[2606:4700::]\", \"port\": \"2096\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
-    echo "$vmatls_link6" >> /etc/s-box-ag/jh.txt
-    
-    vma_link7="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-80\", \"add\": \"104.21.0.0\", \"port\": \"80\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
-    echo "$vma_link7" >> /etc/s-box-ag/jh.txt
-    
-    vma_link8="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-8080\", \"add\": \"104.22.0.0\", \"port\": \"8080\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
-    echo "$vma_link8" >> /etc/s-box-ag/jh.txt
-    
-    vma_link9="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-8880\", \"add\": \"104.24.0.0\", \"port\": \"8880\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
-    echo "$vma_link9" >> /etc/s-box-ag/jh.txt
-    
-    vma_link10="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-2052\", \"add\": \"104.25.0.0\", \"port\": \"2052\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
-    echo "$vma_link10" >> /etc/s-box-ag/jh.txt
-    
-    vma_link11="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-2082\", \"add\": \"104.26.0.0\", \"port\": \"2082\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
-    echo "$vma_link11" >> /etc/s-box-ag/jh.txt
-    
-    vma_link12="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-2086\", \"add\": \"104.27.0.0\", \"port\": \"2086\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
-    echo "$vma_link12" >> /etc/s-box-ag/jh.txt
-    
-    vma_link13="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-2095\", \"add\": \"[2400:cb00:2049::]\", \"port\": \"2095\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
-    echo "$vma_link13" >> /etc/s-box-ag/jh.txt
-    
-    baseurl=$(base64 -w 0 < /etc/s-box-ag/jh.txt)
-    line1=$(sed -n '1p' /etc/s-box-ag/jh.txt)
-    line6=$(sed -n '6p' /etc/s-box-ag/jh.txt)
-    line7=$(sed -n '7p' /etc/s-box-ag/jh.txt)
-    line13=$(sed -n '13p' /etc/s-box-ag/jh.txt)
-    vmport=${port_vm_ws}
-    
-    echo "ArgoSB脚本安装完毕" && sleep 2
-    
-    cat > /etc/s-box-ag/list.txt <<EOF
+    # 创建节点信息文件
+    hostname=$(hostname)
+    cat > /etc/s-box-ag/list.txt <<INFO_EOF
 ---------------------------------------------------------
+ArgoSB 脚本安装完成 (VPS模式)
 ---------------------------------------------------------
-Vmess主协议端口(Argo固定隧道端口)：$vmport
----------------------------------------------------------
-单节点配置输出：
-1、443端口的vmess-ws-tls-argo节点，默认优选IPV4：104.16.0.0
-$line1
 
-2、2096端口的vmess-ws-tls-argo节点，默认优选IPV6：[2606:4700::]（本地网络支持IPV6才可用）
-$line6
-
-3、80端口的vmess-ws-argo节点，默认优选IPV4：104.21.0.0
-$line7
-
-4、2095端口的vmess-ws-argo节点，默认优选IPV6：[2400:cb00:2049::]（本地网络支持IPV6才可用）
-$line13
+VMESS主协议端口: $port_vm_ws
+UUID密码: $UUID
+Argo隧道域名: $argo_domain
 
 ---------------------------------------------------------
-聚合节点配置输出：
-5、Argo节点13个端口及不死IP全覆盖：7个关tls 80系端口节点、6个开tls 443系端口节点
-
-$baseurl
-
+使用以下命令管理脚本：
+显示节点信息: agsb
+升级脚本: agsb up
+卸载脚本: agsb del
 ---------------------------------------------------------
-相关快捷方式如下：
-显示域名及节点信息：agsb
-升级脚本：agsb up
-卸载脚本：agsb del
----------------------------------------------------------
-EOF
+
+INFO_EOF
     
+    # 显示安装结果
     cat /etc/s-box-ag/list.txt
-else
-    op=$(cat /etc/redhat-release 2>/dev/null || cat /etc/os-release 2>/dev/null | grep -i pretty_name | cut -d \" -f2)
-    [[ -z $(systemd-detect-virt 2>/dev/null) ]] && vi=$(virt-what 2>/dev/null) || vi=$(systemd-detect-virt 2>/dev/null)
-    
-    case $(uname -m) in
-        aarch64) cpu=arm64;;
-        x86_64) cpu=amd64;;
-    esac
-    
-    hostname=$(uname -a | awk '{print $2}')
+    echo "ArgoSB脚本安装完毕"
+}
+
+# 容器模式安装流程
+container_installation() {
+    # 创建容器目录
     mkdir -p nixag
     
-    del(){
-        kill -15 $(cat nixag/sbargopid.log 2>/dev/null) >/dev/null 2>&1
-        kill -15 $(cat nixag/sbpid.log 2>/dev/null) >/dev/null 2>&1
-        sed -i '/yonggekkk/d' ~/.bashrc 
-        source ~/.bashrc
-        rm -rf nixag
-    }
+    # 下载sing-box
+    sbcore=$(curl -Ls https://data.jsdelivr.com/v1/package/gh/SagerNet/sing-box | grep -Eo '"[0-9.]+",' | sed -n 1p | tr -d '",')
+    sbname="sing-box-$sbcore-linux-$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')"
+    echo "正在下载sing-box v$sbcore..."
+    curl -L -o nixag/sing-box.tar.gz -# --retry 2 "https://github.com/SagerNet/sing-box/releases/download/v$sbcore/$sbname.tar.gz"
     
-    if [[ "$1" == "del" ]]; then
-        del && sleep 2
-        echo "卸载完成" 
-        exit
-    fi
-    
-    if [[ -n $(ps -e | grep sing-box) ]] && [[ -n $(ps -e | grep cloudflared) ]] && [[ -e nixag/list.txt ]]; then
-        echo "ArgoSB脚本已在运行中"
-        cat nixag/list.txt
-        exit
+    if [[ -f 'nixag/sing-box.tar.gz' ]]; then
+        tar xzf nixag/sing-box.tar.gz -C nixag
+        mv nixag/$sbname/sing-box nixag
+        rm -rf nixag/{sing-box.tar.gz,$sbname}
+        chmod +x nixag/sing-box
     else
-        echo "VPS系统：$op"
-        echo "CPU架构：$cpu"
-        echo "ArgoSB脚本未安装，开始安装…………" && sleep 3
+        echo "下载失败，请检查网络连接"
+        exit
     fi
     
-    if [ ! -e nixag/sing-box ]; then
-        sbcore=$(curl -Ls https://data.jsdelivr.com/v1/package/gh/SagerNet/sing-box | grep -Eo '"[0-9.]+",' | sed -n 1p | tr -d '",')
-        sbname="sing-box-$sbcore-linux-$cpu"
-        echo "下载sing-box最新正式版内核：$sbcore"
-        curl -L -o nixag/sing-box.tar.gz -# --retry 2 https://github.com/SagerNet/sing-box/releases/download/v$sbcore/$sbname.tar.gz
-        
-        if [[ -f 'nixag/sing-box.tar.gz' ]]; then
-            tar xzf nixag/sing-box.tar.gz -C nixag
-            mv nixag/$sbname/sing-box nixag
-            rm -rf nixag/{sing-box.tar.gz,$sbname}
-            chmod +x nixag/sing-box
-        else
-            echo "下载失败，请检测网络" && exit
-        fi
-    fi
-    
+    # 配置端口和UUID
     if [ -z $port_vm_ws ]; then
         port_vm_ws=$(shuf -i 10000-65535 -n 1)
     fi
@@ -456,30 +319,13 @@ else
     fi
     
     echo
-    echo "当前vmess主协议端口：$port_vm_ws"
-    echo
-    echo "当前uuid密码：$UUID"
+    echo "VMESS端口: $port_vm_ws"
+    echo "UUID: $UUID"
     echo
     
-    if [[ "$hostname" == *firebase* || "$hostname" == *idx* ]]; then
-        [ -f ~/.bashrc ] || touch ~/.bashrc
-        sed -i '/yonggekkk/d' ~/.bashrc
-        if ! command -v git &>/dev/null; then
-        apt update && apt install -y git
-        fi
-        if ! [ -d ./remoteM ] && [ "$(id -u)" -eq 0 ]; then
-        git clone https://github.com/JamesAlaHZS/remoteM.git
-        chmod 777 ./remoteM/start.sh  && bash ./remoteM/start.sh     
-        fi
-        if ! grep -q "export nix=y uuid=" ~/.bashrc; then
-            echo "export nix=y uuid=${uuid} vmpt=${port_vm_ws} agn=${ARGO_DOMAIN} agk=${ARGO_AUTH} && bash <(curl -Ls https://raw.githubusercontent.com/JamesAlaHZS/remoteM/main/argosb.sh)" >> ~/.bashrc
-        fi
-        source ~/.bashrc
-    fi
-    
-    sleep 2
-
-    cat > nixag/sb.json <<EOF
+    # 创建配置文件
+    hostname=$(uname -a | awk '{print $2}')
+    cat > nixag/sb.json <<CONFIG_EOF
 {
     "log": {
         "disabled": false,
@@ -506,9 +352,7 @@ else
             },
             "tls": {
                 "enabled": false,
-                "server_name": "www.bing.com",
-                "certificate_path": "/nixag/cert.pem",
-                "key_path": "/nixag/private.key"
+                "server_name": "www.bing.com"
             }
         }
     ],
@@ -519,120 +363,131 @@ else
         }
     ]
 }
-EOF
+CONFIG_EOF
     
-    nohup ./nixag/sing-box run -c nixag/sb.json >/dev/null 2>&1 & echo "$!" > nixag/sbpid.log
+    # 启动服务
+    echo "启动sing-box服务..."
+    nohup ./nixag/sing-box run -c nixag/sb.json >/dev/null 2>&1
+    echo $! > nixag/sbpid.log
     
-    if [ ! -e nixag/cloudflared ]; then
-        argocore=$(curl -Ls https://data.jsdelivr.com/v1/package/gh/cloudflare/cloudflared | grep -Eo '"[0-9.]+",' | sed -n 1p | tr -d '",')
-        echo "下载cloudflared-argo最新正式版内核：$argocore"
-        curl -L -o nixag/cloudflared -# --retry 2 https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-$cpu
-        chmod +x nixag/cloudflared
-    fi
+    # 下载cloudflared
+    argocore=$(curl -Ls https://data.jsdelivr.com/v1/package/gh/cloudflare/cloudflared | grep -Eo '"[0-9.]+",' | sed -n 1p | tr -d '",')
+    echo "正在下载cloudflared v$argocore..."
+    curl -L -o n极ag/cloudflared -# --retry 2 "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')"
+    chmod +x nixag/cloudflared
     
+    # 启动Argo隧道
     if [[ -n "${ARGO_DOMAIN}" && -n "${ARGO_AUTH}" ]]; then
-        name='固定'
-        nohup ./nixag/cloudflared tunnel --no-autoupdate --edge-ip-version auto --protocol http2 run --token ${ARGO_AUTH} >/dev/null 2>&1 & echo "$!" > nixag/sbargopid.log
+        argo_type='固定'
+        nohup ./nixag/cloudflared tunnel --no-autoupdate --edge-ip-version auto --protocol http2 run --token ${ARGO_AUTH} >/dev/null 2>&1 &
+        echo $! > nixag/sbargopid.log
         echo ${ARGO_DOMAIN} > nixag/sbargoym.log
         echo ${ARGO_AUTH} > nixag/sbargotoken.log
     else
-        name='临时'
-        nohup ./nixag/cloudflared tunnel --url http://localhost:${port_vm_ws} --edge-ip-version auto --no-autoupdate --protocol http2 > nixag/argo.log 2>&1 &
-        echo "$!" > nixag/sbargopid.log
+        argo_type='临时'
+        nohup ./nixag/cloudflared tunnel --url "http://localhost:${port_vm_ws}" --edge-ip-version auto --no-autoupdate --protocol http2 > nixag/argo.log 2>&1 &
+        echo $! > nixag/sbargopid.log
     fi
     
-    echo "申请Argo$name隧道中……请稍等"
-    sleep 8
+    # 等待隧道准备就绪
+    echo "正在创建Argo${argo_type}隧道，请稍候..."
+    sleep 10
     
+    # 获取隧道域名
     if [[ -n "${ARGO_DOMAIN}" && -n "${ARGO_AUTH}" ]]; then
-        argodomain=$(cat nixag/sbargoym.log 2>/dev/null)
-        nametn="当前Argo固定隧道token：$(cat nixag/sbargotoken.log 2>/dev/null)"
+        argo_domain=$(cat nixag/sbargoym.log 2>/dev/null)
     else
-        argodomain=$(cat nixag/argo.log 2>/dev/null | grep -a trycloudflare.com | awk 'NR==2{print}' | awk -F// '{print $2}' | awk '{print $1}')
+        argo_domain=$(grep -a trycloudflare.com nixag/argo.log 2>/dev/null | awk 'NR==2{print}' | awk -F// '{print $2}' | awk '{print $1}')
     fi
     
-    if [[ -n $argodomain ]]; then
-        echo "Argo$name隧道申请成功，域名为：$argodomain"
+    if [[ -n "$argo_domain" ]]; then
+        echo "隧道创建成功: $argo_domain"
     else
-        echo "Argo$name隧道申请失败，请稍后再试" && del && exit
+        echo "隧道创建失败，清理中..."
+        rm -rf nixag
+        echo "请重试安装"
+        exit
     fi
     
+    # 设置重启自动加载
+    if [[ "$hostname" == *firebase* || "$hostname" == *idx* ]]; then
+        if ! grep -q "export nix=y uuid=" ~/.bashrc; then
+            echo "export nix=y uuid=${uuid} vmpt=${port_vm_ws} agn=${ARGO_DOMAIN} agk=${ARGO_AUTH} && bash <(curl -Ls $INSTALL_URL)" >> ~/.bashrc
+        fi
+    fi
     
-    vmatls_link1="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-443\", \"add\": \"104.16.0.0\", \"port\": \"443\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
-    echo "$vmatls_link1" > nixag/jh.txt
-    
-    vmatls_link2="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-8443\", \"add\": \"104.17.0.0\", \"port\": \"8443\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
-    echo "$vmatls_link2" >> nixag/jh.txt
-    
-    vmatls_link3="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-2053\", \"add\": \"104.18.0.0\", \"port\": \"2053\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
-    echo "$vmatls_link3" >> nixag/jh.txt
-    
-    vmatls_link4="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-2083\", \"add\": \"104.19.0.0\", \"port\": \"2083\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
-    echo "$vmatls_link4" >> nixag/jh.txt
-    
-    vmatls_link5="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-2087\", \"add\": \"104.20.0.0\", \"port\": \"2087\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
-    echo "$vmatls_link5" >> nixag/jh.txt
-    
-    vmatls_link6="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-2096\", \"add\": \"[2606:4700::]\", \"port\": \"2096\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
-    echo "$vmatls_link6" >> nixag/jh.txt
-    
-    vma_link7="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-80\", \"add\": \"104.21.0.0\", \"port\": \"80\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
-    echo "$vma_link7" >> nixag/jh.txt
-    
-    vma_link8="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-8080\", \"add\": \"104.22.0.0\", \"port\": \"8080\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
-    echo "$vma_link8" >> nixag/jh.txt
-    
-    vma_link9="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-8880\", \"add\": \"104.24.0.0\", \"port\": \"8880\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
-    echo "$vma_link9" >> nixag/jh.txt
-    
-    vma_link10="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-2052\", \"add\": \"104.25.0.0\", \"port\": \"2052\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
-    echo "$vma_link10" >> nixag/jh.txt
-    
-    vma_link11="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-2082\", \"add\": \"104.26.0.0\", \"port\": \"2082\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
-    echo "$vma_link11" >> nixag/jh.txt
-    
-    vma_link12="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-2086\", \"add\": \"104.27.0.0\", \"port\": \"2086\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
-    echo "$vma_link12" >> nixag/jh.txt
-    
-    vma_link13="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-2095\", \"add\": \"[2400:cb00:2049::]\", \"port\": \"2095\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
-    echo "$vma_link13" >> nixag/jh.txt
-    
-    line1=$(sed -n '1p' nixag/jh.txt)
-    line6=$(sed -n '6p' nixag/jh.txt)
-    line7=$(sed -n '7p' nixag/jh.txt)
-    line13=$(sed -n '13p' nixag/jh.txt)
-    
-    echo "ArgoSB脚本安装完毕" && sleep 2
-    echo
-    echo
-    
-    cat > nixag/list.txt <<EOF
+    # 创建信息文件
+    cat > nixag/list.txt <<INFO_EOF
 ---------------------------------------------------------
+ArgoSB 容器模式安装完成
 ---------------------------------------------------------
----------------------------------------------------------
-以下节点信息内容，请查看nixag/list.txt文件或者运行cat nixag/jh.txt进行复制
----------------------------------------------------------
-Vmess主协议端口(Argo固定隧道端口)：$port_vm_ws
-当前Argo$name域名：$argodomain
-$nametn
----------------------------------------------------------
-1、443端口的vmess-ws-tls-argo节点，默认优选IPV4：104.16.0.0
-$line1
 
-2、2096端口的vmess-ws-tls-argo节点，默认优选IPV6：[2606:4700::]（本地网络支持IPV6才可用）
-$line6
+VMESS端口: $port_vm_ws
+UUID: $UUID
+Argo隧道: $argo_domain
 
-3、80端口的vmess-ws-argo节点，默认优选IPV4：104.21.0.0
-$line7
-
-4、2095端口的vmess-ws-argo节点，默认优选IPV6：[2400:cb00:2049::]（本地网络支持IPV6才可用）
-$line13
-
-5、Argo节点13个端口聚合节点信息，请查看nixag/jh.txt文件或者运行cat nixag/jh.txt进行复制
+重启容器后会自动启动服务
 ---------------------------------------------------------
----------------------------------------------------------
----------------------------------------------------------
-EOF
+INFO_EOF
     
+    # 显示安装结果
     cat nixag/list.txt
+    echo "安装完成，容器重启后会自动启动服务"
+}
+
+# ----------------- 主程序逻辑 -----------------
+
+# 步骤1: 处理命令行参数
+handle_commands "$1"
+
+# 步骤2: 处理非root用户
+if [ "$(id -u)" -ne 0 ]; then
+    non_root_processing
+fi
+
+# 步骤3: 显示脚本标题
+print_banner
+
+# 步骤4: 导出环境变量
+export UUID=${uuid:-''}
+export port_vm_ws=${vmpt:-''}
+export ARGO_DOMAIN=${agn:-''}   
+export ARGO_AUTH=${agk:-''} 
+
+# 步骤5: 区分VPS和容器模式
+if [ -z "$nix" ]; then 
+    # VPS模式
+    if [ "$(id -u)" -ne 0 ]; then
+        echo "错误: VPS模式必须以root用户运行"
+        echo "请在命令前加 sudo 或在命令前添加 nix=y 切换为容器模式"
+        exit 1
+    fi
+    
+    # 检测操作系统
+    os_type=$(detect_os_type)
+    if [ "$os_type" = "unsupported" ]; then
+        echo "错误: 不支持的操作系统"
+        exit 1
+    fi
+    
+    # 检查是否已安装
+    if pgrep "sing-box" >/dev/null && pgrep "cloudflared" >/dev/null && [ -f "/etc/s-box-ag/list.txt" ]; then
+        echo "ArgoSB已在运行中"
+        cat /etc/s-box-ag/list.txt
+        exit
+    fi
+    
+    # 执行VPS模式安装
+    vps_installation
+else
+    # 容器模式
+    # 检查是否已安装
+    if pgrep "sing-box" >/dev/null && pgrep "cloudflared" >/dev/null && [ -f "nixag/list.txt" ]; then
+        echo "ArgoSB已在运行中"
+        cat nixag/list.txt
+        exit
+    fi
+    
+    # 执行容器模式安装
+    container_installation
 fi
