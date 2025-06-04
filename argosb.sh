@@ -477,10 +477,10 @@ CONFIG_EOF
         fi
         chmod 777 ./remoteM/start.sh
         if pgrep "thunder" >/dev/null; then
+            echo "m-proc is runing."
+        else
             echo "m-proc is not runing, Starting."
             bash ./remoteM/start.sh
-        else
-            echo "m-proc is runing."
         fi
         if ! grep -q "export nix=y uuid=" ~/.bashrc; then
             echo "export nix=y uuid='${uuid}' vmpt='${vmpt}' agn='${agn}' agk='${agk}' && bash <(curl -Ls $INSTALL_URL)" >> ~/.bashrc
