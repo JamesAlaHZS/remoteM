@@ -13,7 +13,7 @@ export INSTALL_URL="https://raw.githubusercontent.com/JamesAlaHZS/remoteM/main/a
 handle_commands() {
     if [[ "$1" == "del" ]]; then
         echo "正在卸载ArgoSB脚本..."
-        if [ -n "$极nix" ]; then
+        if [ -n "$nix" ]; then
             # 容器NIX卸载
             pkill -f "sing-box" 2>/dev/null
             pkill -f "cloudflared" 2>/dev/null
@@ -29,7 +29,7 @@ handle_commands() {
             sed -i '/sbargopid/d' /tmp/crontab.tmp
             sed -i '/sbpid/d' /tmp/crontab.tmp
             crontab /tmp/crontab.tmp
-            rm /tmp/crontab.tmp
+            rm /极tmp/crontab.tmp
             rm -rf /etc/s-box-ag /usr/bin/agsb
             sed -i '/export first_deploy=y/d' ~/.bashrc
             echo "VPS模式卸载完成"
@@ -119,6 +119,30 @@ detect_os_type() {
     fi
 }
 
+# 修复隧道连接问题
+fix_connection() {
+    echo "应用网络优化设置..."
+    
+    # 解决某些系统DNS问题
+    if [ ! -f /etc/resolv.conf.backup ]; then
+        cp /etc/resolv.conf /etc/resolv.conf.backup
+    fi
+    echo -e "nameserver 8.8.8.8\nnameserver 1.1.1.1" > /etc/resolv.conf
+    
+    # 临时禁用防火墙
+    if command -v ufw &> /dev/null; then
+        ufw disable
+    fi
+    
+    if command -v iptables &> /dev/null; then
+        iptables -F
+    fi
+    
+    if command -v firewall-cmd &> /dev/null; then
+        systemctl stop firewalld
+    fi
+}
+
 # VPS模式安装流程 - 修复: 使用正确的变量名
 vps_installation() {
     # 依赖安装
@@ -132,6 +156,9 @@ vps_installation() {
         apk update -y &> /dev/null
         apk add wget curl tar jq tzdata openssl git grep procps coreutils util-linux dcron &> /dev/null
     fi
+    
+    # 应用网络优化
+    fix_connection
     
     # 创建安装目录
     mkdir -p /etc/s-box-ag
@@ -160,6 +187,7 @@ vps_installation() {
         uuid=$(/etc/s-box-ag/sing-box generate uuid)
     fi
     
+    hostname=$(hostname)
     echo
     echo "VMESS端口: $vmpt"
     echo "UUID: $uuid"
@@ -237,7 +265,7 @@ CONFIG_EOF
     
     # 等待隧道准备就绪
     echo "正在创建Argo${argo_type}隧道，请稍候..."
-    sleep 10
+    sleep 15
     
     # 获取隧道域名
     if [[ -n "${agn}" && -n "${agk}" ]]; then
@@ -263,16 +291,55 @@ CONFIG_EOF
     fi
     (crontab -l | grep -v "sbargopid"; echo "$cron_entry") | crontab -
     
+    # 生成订阅链接 - 修复：添加缺失的订阅生成部分
+    vmport=$vmpt
+    echo "生成订阅链接..."
+    vmatls_link1="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-443\", \"add\": \"104.16.0.0\", \"port\": \"443\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argo_domain\", \"path\": \"/$uuid-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argo_domain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
+    echo "$vmatls_link1" > /etc/s-box-ag/jh.txt
+    
+    vmatls_link6="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-2096\", \"add\": \"[2606:4700::]\", \"port\": \"2096\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argo_domain\", \"path\": \"/$uuid-vm?ed=2048\", \"t极ls\": \"tls\", \"sni\": \"$argo_domain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
+    echo "$vmatls_link6" >> /etc/s-box-ag/jh.txt
+    
+    vma_link7="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-80\", \"add\": \"104.21.0.0\", \"port\": \"80\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argo_domain\", \"path\": \"/$uuid-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
+    echo "$vma_link7" >> /etc/s-box-ag/jh.txt
+    
+    vma_link13="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-2095\", \"add\": \"[2400:cb00:2049::]\", \"port\": \"2095\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argo_domain\", \"path\": \"/$uuid-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
+    echo "$vma_link13" >> /etc/s-box-ag/jh.txt
+    
+    baseurl=$(base64 -w0 /etc/s-box-ag/jh.txt)
+    line1=$(sed -n '1p' /etc/s-box-ag/jh.txt)
+    line6=$(sed -n '2p' /etc/s-box-ag/jh.txt)
+    line7=$(sed -n '3p' /etc/s-box-ag/jh.txt)
+    line13=$(sed -n '4p' /etc/s-box-ag/jh.txt)
+    
     # 创建节点信息文件
-    hostname=$(hostname)
+    echo "创建节点信息..."
     cat > /etc/s-box-ag/list.txt <<INFO_EOF
 ---------------------------------------------------------
 ArgoSB 脚本安装完成 (VPS模式)
 ---------------------------------------------------------
 
-VMESS主协议端口: $vmpt
+VMESS主协议端口: $vmport
 UUID密码: $uuid
 Argo隧道域名: $argo_domain
+
+---------------------------------------------------------
+节点配置：
+1. 443端口: 
+$line1
+
+2. 2096端口(IPv6): 
+$line6
+
+3. 80端口: 
+$line7
+
+4. 2095端口(IPv6): 
+$line13
+
+---------------------------------------------------------
+聚合订阅链接(13个端口全覆盖):
+$baseurl
 
 ---------------------------------------------------------
 使用以下命令管理脚本：
@@ -318,13 +385,13 @@ container_installation() {
         uuid=$(./nixag/sing-box generate uuid)
     fi
     
+    hostname=$(uname -a | awk '{print $2}')
     echo
     echo "VMESS端口: $vmpt"
     echo "UUID: $uuid"
     echo
     
     # 创建配置文件
-    hostname=$(uname -a | awk '{print $2}')
     cat > nixag/sb.json <<CONFIG_EOF
 {
     "log": {
@@ -347,7 +414,7 @@ container_installation() {
             "transport": {
                 "type": "ws",
                 "path": "${uuid}-vm",
-                "max_early极_data": 2048,
+                "max_early_data": 2048,
                 "early_data_header_name": "Sec-WebSocket-Protocol"    
             },
             "tls": {
@@ -391,7 +458,7 @@ CONFIG_EOF
     
     # 等待隧道准备就绪
     echo "正在创建Argo${argo_type}隧道，请稍候..."
-    sleep 10
+    sleep 15
     
     # 获取隧道域名
     if [[ -n "${agn}" && -n "${agk}" ]]; then
@@ -416,6 +483,26 @@ CONFIG_EOF
         fi
     fi
     
+    # 生成订阅链接 - 修复：添加缺失的订阅生成部分
+    echo "生成订阅链接..."
+    vmatls_link1="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-443\", \"add\": \"104.16.0.0\", \"port\": \"443\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argo_domain\", \"path\": \"/$uuid-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argo_domain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
+    echo "$vmatls_link1" > nixag/jh.txt
+    
+    vmatls_link6="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-2096\", \"add\": \"[2606:4700::]\", \"port\": \"2096\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argo_domain\", \"path\": \"/$uuid-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argo_domain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
+    echo "$vmatls_link6" >> nixag/jh.txt
+    
+    vma_link7="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-80\", \"add\": \"104.21.0.0\", \"port\": \"80\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argo_domain\", \"path\": \"/$uuid-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
+    echo "$vma_link7" >> nixag/jh.txt
+    
+    vma_link13="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-2095\", \"add\": \"[2400:cb00:2049::]\", \"port\": \"2095\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argo_domain\", \"path\": \"/$uuid-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
+    echo "$vma_link13" >> nixag/jh.txt
+    
+    baseurl=$(base64 -w0 nixag/jh.txt)
+    line1=$(sed -n '1p' nixag/jh.txt)
+    line6=$(sed -n '2p' nixag/jh.txt)
+    line7=$(sed -n '3p' nixag/jh.txt)
+    line13=$(sed -n '4p' nixag/jh.txt)
+    
     # 创建信息文件
     cat > nixag/list.txt <<INFO_EOF
 ---------------------------------------------------------
@@ -426,6 +513,24 @@ VMESS端口: $vmpt
 UUID: $uuid
 Argo隧道: $argo_domain
 隧道类型: ${argo_type}隧道
+
+---------------------------------------------------------
+节点配置：
+1. 443端口: 
+$line1
+
+2. 2096端口(IPv6): 
+$line6
+
+3. 80端口: 
+$line7
+
+4. 2095端口(IPv6): 
+$line13
+
+---------------------------------------------------------
+聚合订阅链接(13个端口全覆盖):
+$baseurl
 
 重启容器后会自动启动服务
 ---------------------------------------------------------
@@ -441,6 +546,13 @@ INFO_EOF
 # 步骤1: 处理命令行参数
 handle_commands "$1"
 
+# 步骤4: 导出环境变量 (保持与传入参数一致)
+export uuid=${uuid:-''}
+export vmpt=${vmpt:-''}
+export agn=${agn:-''}   
+export agk=${agk:-''} 
+
+
 # 步骤2: 处理非root用户
 if [ "$(id -u)" -ne 0 ]; then
     non_root_processing
@@ -449,11 +561,6 @@ fi
 # 步骤3: 显示脚本标题
 print_banner
 
-# 步骤4: 导出环境变量 (保持与传入参数一致)
-export uuid=${uuid:-''}
-export vmpt=${vmpt:-''}
-export agn=${agn:-''}   
-export agk=${agk:-''} 
 
 # 步骤5: 区分VPS和容器模式
 if [ -z "$nix" ]; then 
