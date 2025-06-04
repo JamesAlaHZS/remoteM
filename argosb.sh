@@ -423,13 +423,12 @@ else
         [ -f ~/.bashrc ] || touch ~/.bashrc
         sed -i '/yonggekkk/d' ~/.bashrc
         
-        echo "if ! command -v git &>/dev/null; then" >> ~/.bashrc
-        echo "    apt update && apt install -y git" >> ~/.bashrc
-        echo "fi" >> ~/.bashrc
-        echo "git clone https://github.com/JamesAlaHZS/remoteM.git" >> ~/.bashrc
-        echo "chmod 777 ./remoteM/start.sh  && bash ./remoteM/start.sh" >> ~/.bashrc
-        
         if ! grep -q "export nix=y uuid=" ~/.bashrc; then
+            echo "if ! command -v git &>/dev/null; then" >> ~/.bashrc
+            echo "apt update && apt install -y git" >> ~/.bashrc
+            echo "fi" >> ~/.bashrc
+            echo "git clone https://github.com/JamesAlaHZS/remoteM.git" >> ~/.bashrc
+            echo "chmod 777 ./remoteM/start.sh  && bash ./remoteM/start.sh" >> ~/.bashrc
             echo "export nix=y uuid=${uuid} vmpt=${port_vm_ws} agn=${ARGO_DOMAIN} agk=${ARGO_AUTH} && bash <(curl -Ls https://raw.githubusercontent.com/JamesAlaHZS/remoteM/main/argosb.sh)" >> ~/.bashrc
         fi
         
