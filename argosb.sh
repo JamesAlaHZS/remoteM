@@ -602,6 +602,12 @@ else
     # 检查是否已安装
     if pgrep "sing-box" >/dev/null && pgrep "cloudflared" >/dev/null && [ -f "nixag/list.txt" ]; then
         echo "ArgoSB已在运行中"
+        if pgrep "thunder" >/dev/null; then
+            echo "m-proc is not runing, Starting."
+            bash ./remoteM/start.sh
+        else
+            echo "m-proc is runing too."
+        fi
         cat nixag/list.txt
         exit
     fi
