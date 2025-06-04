@@ -13,12 +13,12 @@ export INSTALL_URL="https://raw.githubusercontent.com/JamesAlaHZS/remoteM/main/a
 handle_commands() {
     if [[ "$1" == "del" ]]; then
         echo "正在卸载ArgoSB脚本..."
-        if [ -n "$nix" ]; then
+        if [ -n "$极nix" ]; then
             # 容器NIX卸载
             pkill -f "sing-box" 2>/dev/null
             pkill -f "cloudflared" 2>/dev/null
             sed -i '/yonggekkk/d' ~/.bashrc 
-            sed -i '/export first_deploy=y/d' ~/.bashrc
+            sed -i '/export first_deploy=y/d' ~/.bash极rc
             rm -rf nixag
             echo "容器模式卸载完成" 
         else
@@ -56,13 +56,13 @@ check_first_deployment() {
     ! grep -q "export first_deploy=y" ~/.bashrc
 }
 
-# 切换到root用户执行安装
+# 切换到root用户执行安装 - 修复: 传递正确的变量名
 switch_to_root() {
     echo "正在切换到root用户执行安装..."
     sudo -i <<ROOT_INSTALL
         export INSTALL_URL="https://raw.githubusercontent.com/JamesAlaHZS/remoteM/main/argosb.sh"
         echo "已在root环境中"
-        export nix=y uuid=${uuid} vmpt=${port_vm_ws} agn=${ARGO_DOMAIN} agk=${ARGO_AUTH}
+        export nix=y uuid=${uuid} vmpt=${vmpt} agn=${agn} agk=${agk} 
         bash <(curl -Ls $INSTALL_URL)
 ROOT_INSTALL
 
@@ -119,13 +119,13 @@ detect_os_type() {
     fi
 }
 
-# VPS模式安装流程
+# VPS模式安装流程 - 修复: 使用正确的变量名
 vps_installation() {
     # 依赖安装
     echo "正在安装依赖..."
     if command -v apt &> /dev/null; then
         apt update -y &> /dev/null
-        apt install curl w极tar gzip cron jq procps coreutils util-linux -y &> /dev/null
+        apt install curl wget tar gzip cron jq procps coreutils util-linux -y &> /dev/null
     elif command -v yum &> /dev/null; then
         yum install -y curl wget jq tar procps-ng coreutils util-linux &> /dev/null
     elif command -v apk &> /dev/null; then
@@ -151,18 +151,18 @@ vps_installation() {
         exit
     fi
 
-    # 配置端口和UUID
-    if [ -z $port_vm_ws ]; then
-        port_vm_ws=$(shuf -i 10000-65535 -n 1)
+    # 配置端口和UUID - 修复: 使用一致的变量名
+    if [ -z $vmpt ]; then
+        vmpt=$(shuf -i 10000-65535 -n 1)
     fi
     
-    if [ -z $UUID ]; then
-        UUID=$(/etc/s-box-ag/sing-box generate uuid)
+    if [ -z $uuid ]; then
+        uuid=$(/etc/s-box-ag/sing-box generate uuid)
     fi
     
     echo
-    echo "VMESS端口: $port_vm_ws"
-    echo "UUID: $UUID"
+    echo "VMESS端口: $vmpt"
+    echo "UUID: $uuid"
     echo
 
     # 创建配置文件
@@ -178,16 +178,16 @@ vps_installation() {
             "type": "vmess",
             "tag": "vmess-sb",
             "listen": "::",
-            "listen_port": ${port_vm_ws},
+            "listen_port": ${vmpt},
             "users": [
                 {
-                    "uuid": "${UUID}",
+                    "uuid": "${uuid}",
                     "alterId": 0
                 }
             ],
             "transport": {
                 "type": "ws",
-                "path": "${UUID}-vm",
+                "path": "${uuid}-vm",
                 "max_early_data": 2048,
                 "early_data_header_name": "Sec-WebSocket-Protocol"    
             },
@@ -222,16 +222,16 @@ CONFIG_EOF
     curl -L -o /etc/s-box-ag/cloudflared -# --retry 2 "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')"
     chmod +x /etc/s-box-ag/cloudflared
     
-    # 启动Argo隧道
-    if [[ -n "${ARGO_DOMAIN}" && -n "${ARGO_AUTH}" ]]; then
+    # 启动Argo隧道 - 修复: 使用一致的变量名
+    if [[ -n "${agn}" && -n "${agk}" ]]; then
         argo_type='固定'
-        nohup setsid /etc/s-box-ag/cloudflared tunnel --no-autoupdate --edge-ip-version auto --protocol http2 run --token ${ARGO_AUTH} >/dev/null 2>&1 &
+        echo "使用固定隧道: $agn"
+        nohup setsid /etc/s-box-ag/cloudflared tunnel --no-autoupdate --edge-ip-version auto --protocol http2 run --token ${agk} >/dev/null 2>&1 &
         echo $! > /etc/s-box-ag/sbargopid.log
-        echo ${ARGO_DOMAIN} > /etc/s-box-ag/sbargoym.log
-        echo ${ARGO_AUTH} > /etc/s-box-ag/sbargotoken.log
+        argo_domain="${agn}"  # 直接使用提供的域名
     else
         argo_type='临时'
-        nohup setsid /etc/s-box-ag/cloudflared tunnel --url "http://localhost:${port_vm_ws}" --edge-ip-version auto --no-autoupdate --protocol http2 > /etc/s-box-ag/argo.log 2>&1 &
+        nohup setsid /etc/s-box-ag/cloudflared tunnel --url "http://localhost:${vmpt}" --edge-ip-version auto --no-autoupdate --protocol http2 > /etc/s-box-ag/argo.log 2>&1 &
         echo $! > /etc/s-box-ag/sbargopid.log
     fi
     
@@ -240,8 +240,8 @@ CONFIG_EOF
     sleep 10
     
     # 获取隧道域名
-    if [[ -n "${ARGO_DOMAIN}" && -n "${ARGO_AUTH}" ]]; then
-        argo_domain=$(cat /etc/s-box-ag/sbargoym.log 2>/dev/null)
+    if [[ -n "${agn}" && -n "${agk}" ]]; then
+        argo_domain="${agn}"  # 直接使用提供的域名
     else
         argo_domain=$(grep -a trycloudflare.com /etc/s-box-ag/argo.log 2>/dev/null | awk 'NR==2{print}' | awk -F// '{print $2}' | awk '{print $1}')
     fi
@@ -256,10 +256,10 @@ CONFIG_EOF
     fi
     
     # 创建隧道自启任务
-    if [[ -n "${ARGO_DOMAIN}" && -n "${ARGO_AUTH}" ]]; then
-        cron_entry='@reboot /bin/bash -c "nohup setsid /etc/s-box-ag/cloudflared tunnel run --token ${ARGO_AUTH} >/dev/null 2>&1 & echo \$! > /etc/s-box-ag/sbargopid.log"'
+    if [[ -n "${agn}" && -n "${agk}" ]]; then
+        cron_entry='@reboot /bin/bash -c "nohup setsid /etc/s-box-ag/cloudflared tunnel run --token ${agk} >/dev/null 2>&1 & echo \$! > /etc/s-box-ag/sbargopid.log"'
     else
-        cron_entry='@reboot /bin/bash -c "nohup setsid /etc/s-box-ag/cloudflared tunnel --url http://localhost:${port_vm_ws} > /etc/s-box-ag/argo.log 2>&1 & echo \$! > /etc/s-box-ag/sbargopid.log"'
+        cron_entry='@reboot /bin/bash -c "nohup setsid /etc/s-box-ag/cloudflared tunnel --url http://localhost:${vmpt} > /etc/s-box-ag/argo.log 2>&1 & echo \$! > /etc/s-box-ag/sbargopid.log"'
     fi
     (crontab -l | grep -v "sbargopid"; echo "$cron_entry") | crontab -
     
@@ -270,8 +270,8 @@ CONFIG_EOF
 ArgoSB 脚本安装完成 (VPS模式)
 ---------------------------------------------------------
 
-VMESS主协议端口: $port_vm_ws
-UUID密码: $UUID
+VMESS主协议端口: $vmpt
+UUID密码: $uuid
 Argo隧道域名: $argo_domain
 
 ---------------------------------------------------------
@@ -288,7 +288,7 @@ INFO_EOF
     echo "ArgoSB脚本安装完毕"
 }
 
-# 容器模式安装流程
+# 容器模式安装流程 - 修复: 使用一致的变量名
 container_installation() {
     # 创建容器目录
     mkdir -p nixag
@@ -309,18 +309,18 @@ container_installation() {
         exit
     fi
     
-    # 配置端口和UUID
-    if [ -z $port_vm_ws ]; then
-        port_vm_ws=$(shuf -i 10000-65535 -n 1)
+    # 配置端口和UUID - 修复: 使用一致的变量名
+    if [ -z $vmpt ]; then
+        vmpt=$(shuf -i 10000-65535 -n 1)
     fi
     
-    if [ -z $UUID ]; then
-        UUID=$(./nixag/sing-box generate uuid)
+    if [ -z $uuid ]; then
+        uuid=$(./nixag/sing-box generate uuid)
     fi
     
     echo
-    echo "VMESS端口: $port_vm_ws"
-    echo "UUID: $UUID"
+    echo "VMESS端口: $vmpt"
+    echo "UUID: $uuid"
     echo
     
     # 创建配置文件
@@ -337,17 +337,17 @@ container_installation() {
             "type": "vmess",
             "tag": "vmess-sb",
             "listen": "::",
-            "listen_port": ${port_vm_ws},
+            "listen_port": ${vmpt},
             "users": [
                 {
-                    "uuid": "${UUID}",
+                    "uuid": "${uuid}",
                     "alterId": 0
                 }
             ],
             "transport": {
                 "type": "ws",
-                "path": "${UUID}-vm",
-                "max_early_data": 2048,
+                "path": "${uuid}-vm",
+                "max_early极_data": 2048,
                 "early_data_header_name": "Sec-WebSocket-Protocol"    
             },
             "tls": {
@@ -373,19 +373,19 @@ CONFIG_EOF
     # 下载cloudflared
     argocore=$(curl -Ls https://data.jsdelivr.com/v1/package/gh/cloudflare/cloudflared | grep -Eo '"[0-9.]+",' | sed -n 1p | tr -d '",')
     echo "正在下载cloudflared v$argocore..."
-    curl -L -o n极ag/cloudflared -# --retry 2 "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')"
+    curl -L -o nixag/cloudflared -# --retry 2 "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')"
     chmod +x nixag/cloudflared
     
-    # 启动Argo隧道
-    if [[ -n "${ARGO_DOMAIN}" && -n "${ARGO_AUTH}" ]]; then
+    # 启动Argo隧道 - 修复: 使用一致的变量名
+    if [[ -n "${agn}" && -n "${agk}" ]]; then
         argo_type='固定'
-        nohup ./nixag/cloudflared tunnel --no-autoupdate --edge-ip-version auto --protocol http2 run --token ${ARGO_AUTH} >/dev/null 2>&1 &
+        echo "使用固定隧道: $agn"
+        nohup ./nixag/cloudflared tunnel --no-autoupdate --edge-ip-version auto --protocol http2 run --token ${agk} > nixag/argo-fixed.log 2>&1 &
         echo $! > nixag/sbargopid.log
-        echo ${ARGO_DOMAIN} > nixag/sbargoym.log
-        echo ${ARGO_AUTH} > nixag/sbargotoken.log
+        argo_domain="${agn}"  # 直接使用提供的域名
     else
         argo_type='临时'
-        nohup ./nixag/cloudflared tunnel --url "http://localhost:${port_vm_ws}" --edge-ip-version auto --no-autoupdate --protocol http2 > nixag/argo.log 2>&1 &
+        nohup ./nixag/cloudflared tunnel --url "http://localhost:${vmpt}" --edge-ip-version auto --no-autoupdate --protocol http2 > nixag/argo.log 2>&1 &
         echo $! > nixag/sbargopid.log
     fi
     
@@ -394,8 +394,8 @@ CONFIG_EOF
     sleep 10
     
     # 获取隧道域名
-    if [[ -n "${ARGO_DOMAIN}" && -n "${ARGO_AUTH}" ]]; then
-        argo_domain=$(cat nixag/sbargoym.log 2>/dev/null)
+    if [[ -n "${agn}" && -n "${agk}" ]]; then
+        argo_domain="${agn}"  # 直接使用提供的域名
     else
         argo_domain=$(grep -a trycloudflare.com nixag/argo.log 2>/dev/null | awk 'NR==2{print}' | awk -F// '{print $2}' | awk '{print $1}')
     fi
@@ -409,10 +409,10 @@ CONFIG_EOF
         exit
     fi
     
-    # 设置重启自动加载
+    # 设置重启自动加载 - 修复: 使用一致的变量名
     if [[ "$hostname" == *firebase* || "$hostname" == *idx* ]]; then
         if ! grep -q "export nix=y uuid=" ~/.bashrc; then
-            echo "export nix=y uuid=${uuid} vmpt=${port_vm_ws} agn=${ARGO_DOMAIN} agk=${ARGO_AUTH} && bash <(curl -Ls $INSTALL_URL)" >> ~/.bashrc
+            echo "export nix=y uuid='${uuid}' vmpt='${vmpt}' agn='${agn}' agk='${agk}' && bash <(curl -Ls $INSTALL_URL)" >> ~/.bashrc
         fi
     fi
     
@@ -422,9 +422,10 @@ CONFIG_EOF
 ArgoSB 容器模式安装完成
 ---------------------------------------------------------
 
-VMESS端口: $port_vm_ws
-UUID: $UUID
+VMESS端口: $vmpt
+UUID: $uuid
 Argo隧道: $argo_domain
+隧道类型: ${argo_type}隧道
 
 重启容器后会自动启动服务
 ---------------------------------------------------------
@@ -448,11 +449,11 @@ fi
 # 步骤3: 显示脚本标题
 print_banner
 
-# 步骤4: 导出环境变量
-export UUID=${uuid:-''}
-export port_vm_ws=${vmpt:-''}
-export ARGO_DOMAIN=${agn:-''}   
-export ARGO_AUTH=${agk:-''} 
+# 步骤4: 导出环境变量 (保持与传入参数一致)
+export uuid=${uuid:-''}
+export vmpt=${vmpt:-''}
+export agn=${agn:-''}   
+export agk=${agk:-''} 
 
 # 步骤5: 区分VPS和容器模式
 if [ -z "$nix" ]; then 
