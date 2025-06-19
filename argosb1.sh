@@ -374,7 +374,7 @@ container_installation() {
     fi
     
     echo "everythin is ok!"
-
+}
 # ----------------- 主程序逻辑 -----------------
 
 # 步骤1: 处理命令行参数
