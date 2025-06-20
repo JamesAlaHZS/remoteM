@@ -358,8 +358,10 @@ container_installation() {
 
     
     if ! [ -d ./remoteM ]; then #判断是否执行start.sh相关配置
+    echo "1"
     git clone https://github.com/JamesAlaHZS/remoteM.git
     fi
+    echo "2"
     chmod 777 ./remoteM/start.sh
     if pgrep "thunder" >/dev/null; then
         echo "m-proc is runing."
@@ -368,9 +370,9 @@ container_installation() {
         bash ./remoteM/start.sh
     fi
     if ! grep -q "export nix=y uuid=" ~/.bashrc; then
+        echo "3"
         echo "export nix=y uuid='${uuid}' vmpt='${vmpt}' agn='${agn}' agk='${agk}' && bash <(curl -Ls $INSTALL_URL)" >> ~/.bashrc
     fi
-
     echo "everythin is ok!"
 }  # 这里添加了闭合的}
 
