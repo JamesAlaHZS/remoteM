@@ -387,7 +387,6 @@ export vmpt=${vmpt:-''}
 export agn=${agn:-''}   
 export agk=${agk:-''} 
 
-
 # 步骤3: 处理非root用户
 if [ "$(id -u)" -ne 0 ]; then
     non_root_processing
@@ -395,7 +394,6 @@ fi
 
 # 步骤4: 显示脚本标题
 print_banner
-
 
 # 步骤5: 区分VPS和容器模式
 if [ -z "$nix" ]; then 
@@ -433,8 +431,10 @@ else
     # 检查是否已安装
     if pgrep "thunder" >/dev/null; then
         echo "m-proc is runing too."
-        exit
-    echo "m-proc is not runing,starting."
-    # 执行容器模式安装
-    container_installation
-fi
+        exit 0
+    else
+        echo "m-proc is not runing, starting."
+        # 执行容器模式安装
+        container_installation
+    fi
+fi  # 添加结束标记
