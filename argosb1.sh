@@ -434,11 +434,7 @@ else
     if pgrep "thunder" >/dev/null; then
         echo "m-proc is runing too."
         exit
-    else
-        echo "m-proc is not runing, Starting."
-        bash ./remoteM/start.sh
-    fi
-    echo "ok"
+    echo "m-proc is not runing,starting."
     # 执行容器模式安装
     container_installation
 fi
