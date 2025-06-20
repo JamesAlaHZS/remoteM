@@ -374,7 +374,8 @@ container_installation() {
     fi
     
     echo "everythin is ok!"
-}
+}  # 这里添加了闭合的}
+
 # ----------------- 主程序逻辑 -----------------
 
 # 步骤1: 处理命令行参数
@@ -430,15 +431,14 @@ if [ -z "$nix" ]; then
 else
     # 容器模式
     # 检查是否已安装
-
     if pgrep "thunder" >/dev/null; then
         echo "m-proc is runing too."
+        exit
     else
         echo "m-proc is not runing, Starting."
         bash ./remoteM/start.sh
     fi
     echo "ok"
-    exit
     # 执行容器模式安装
     container_installation
 fi
