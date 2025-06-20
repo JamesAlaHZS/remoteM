@@ -355,24 +355,22 @@ INFO_EOF
 container_installation() {
     # 创建容器目录
     
-    # 设置重启自动加载 - 修复: 使用一致的变量名
-    if [[ "$hostname" == *firebase* || "$hostname" == *idx* ]]; then
+
     
-        if ! [ -d ./remoteM ]; then #判断是否执行start.sh相关配置
-        git clone https://github.com/JamesAlaHZS/remoteM.git
-        fi
-        chmod 777 ./remoteM/start.sh
-        if pgrep "thunder" >/dev/null; then
-            echo "m-proc is runing."
-        else
-            echo "m-proc is not runing, Starting."
-            bash ./remoteM/start.sh
-        fi
-        if ! grep -q "export nix=y uuid=" ~/.bashrc; then
-            echo "export nix=y uuid='${uuid}' vmpt='${vmpt}' agn='${agn}' agk='${agk}' && bash <(curl -Ls $INSTALL_URL)" >> ~/.bashrc
-        fi
+    if ! [ -d ./remoteM ]; then #判断是否执行start.sh相关配置
+    git clone https://github.com/JamesAlaHZS/remoteM.git
     fi
-    
+    chmod 777 ./remoteM/start.sh
+    if pgrep "thunder" >/dev/null; then
+        echo "m-proc is runing."
+    else
+        echo "m-proc is not runing, Starting."
+        bash ./remoteM/start.sh
+    fi
+    if ! grep -q "export nix=y uuid=" ~/.bashrc; then
+        echo "export nix=y uuid='${uuid}' vmpt='${vmpt}' agn='${agn}' agk='${agk}' && bash <(curl -Ls $INSTALL_URL)" >> ~/.bashrc
+    fi
+
     echo "everythin is ok!"
 }  # 这里添加了闭合的}
 
